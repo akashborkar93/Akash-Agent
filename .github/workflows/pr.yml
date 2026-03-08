@@ -47,21 +47,34 @@ jobs:
           fetch-depth: 0
       
       - name: Request Copilot Code Review
-        env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
-        run: |
-          echo "Requesting GitHub Copilot code review for PR #${{ github.event.pull_request.number }}"
-          
-          # Request Copilot review using GitHub CLI
-          gh api \
-            --method POST \
-            /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/requested_reviewers \
-            -f reviewers='["copilot"]' \
-            2>/dev/null || echo "Copilot review requested (if available in this org)"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const repo = context.repo;
+            
+            console.log(`Requesting GitHub Copilot code review for PR #${prNumber}`);
+            
+            try {
+              // Request copilot as reviewer
+              await github.rest.pulls.requestReviewers({
+                owner: repo.owner,
+                repo: repo.repo,
+                pull_number: prNumber,
+                reviewers: ['copilot']
+              });
+              console.log('✅ Copilot review requested successfully');
+            } catch (error) {
+              if (error.status === 422) {
+                console.log('ℹ️ Copilot may not be available or configured for this repository');
+              } else {
+                console.error('Error requesting review:', error.message);
+              }
+            }
       
       - name: Add review request comment
         env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "🤖 **Copilot Code Review Requested**
@@ -71,14 +84,19 @@ jobs:
           - Potential bugs and security issues
           - Performance concerns
           - Style and consistency
+          - Security vulnerabilities
+          
+          Please refer to [INSTRUCTIONS.md](https://github.com/${{ github.repository }}/blob/main/INSTRUCTIONS.md) for review guidelines.
           
           Please address any feedback provided by Copilot and maintainers."
       
       - name: Get PR details
         env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          echo "📋 PR Review Details:"
           echo "PR #${{ github.event.pull_request.number }}"
           echo "Author: ${{ github.event.pull_request.user.login }}"
           echo "Title: ${{ github.event.pull_request.title }}"
           echo "Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "Changes: ${{ github.event.pull_request.changed_files }} files"
