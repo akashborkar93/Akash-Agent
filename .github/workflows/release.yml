@@ -7,6 +7,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -27,3 +30,75 @@ jobs:
       
       - name: Notify
         run: echo "Release notification sent"
+
+  deploy-to-ec2:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Create EC2 instance
+        id: create-instance
+        run: |
+          INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id ami-0c55b159cbfafe1f0 \
+            --instance-type t2.micro \
+            --key-name devops-key \
+            --security-groups web-server \
+            --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Nginx-Webserver-${{ github.run_number }}},{Key=Environment,Value=production}]' \
+            --user-data file://./scripts/nginx-setup.sh \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Created EC2 Instance: $INSTANCE_ID"
+      
+      - name: Wait for instance to be running
+        run: |
+          aws ec2 wait instance-running \
+            --instance-ids ${{ steps.create-instance.outputs.instance_id }} \
+            --region ${{ env.AWS_REGION }}
+          echo "Instance is now running"
+      
+      - name: Get instance details
+        id: instance-details
+        run: |
+          INSTANCE_DETAILS=$(aws ec2 describe-instances \
+            --instance-ids ${{ steps.create-instance.outputs.instance_id }} \
+            --query 'Reservations[0].Instances[0].[PublicIpAddress,PrivateIpAddress,State.Name]' \
+            --output text)
+          echo "Instance Details: $INSTANCE_DETAILS"
+          PUBLIC_IP=$(echo $INSTANCE_DETAILS | awk '{print $1}')
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+      
+      - name: Configure nginx webserver
+        run: |
+          echo "Waiting for nginx setup script to complete..."
+          sleep 30
+          
+          # Test nginx is running
+          curl -I http://${{ steps.instance-details.outputs.public_ip }} || echo "Nginx still starting..."
+      
+      - name: Verify nginx installation
+        run: |
+          aws ssm send-command \
+            --instance-ids ${{ steps.create-instance.outputs.instance_id }} \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["systemctl status nginx"]' \
+            --region ${{ env.AWS_REGION }}
+      
+      - name: Log deployment info
+        run: |
+          echo "✅ EC2 Instance Deployment Successful"
+          echo "Instance ID: ${{ steps.create-instance.outputs.instance_id }}"
+          echo "Public IP: ${{ steps.instance-details.outputs.public_ip }}"
+          echo "Nginx Server: http://${{ steps.instance-details.outputs.public_ip }}"
+      
+      - name: Notify deployment
+        run: echo "EC2 instance with nginx deployed successfully"
