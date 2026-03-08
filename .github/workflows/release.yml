@@ -101,4 +101,4 @@ jobs:
           echo "Nginx Server: http://${{ steps.instance-details.outputs.public_ip }}"
       
       - name: Notify deployment
-        run: echo "EC2 instance with nginx deployed successfully"
+        run: echo "EC2 instance with nginx deployed finally"
