@@ -41,6 +41,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -73,30 +74,49 @@ jobs:
             }
       
       - name: Add review request comment
-        env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
-        run: |
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "🤖 **Copilot Code Review Requested**
-          
-          Automated code review by GitHub Copilot is in progress. This review will check for:
-          - Code quality and best practices
-          - Potential bugs and security issues
-          - Performance concerns
-          - Style and consistency
-          - Security vulnerabilities
-          
-          Please refer to [INSTRUCTIONS.md](https://github.com/${{ github.repository }}/blob/main/INSTRUCTIONS.md) for review guidelines.
-          
-          Please address any feedback provided by Copilot and maintainers."
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const repo = context.repo;
+            
+            const commentBody = `🤖 **Copilot Code Review Requested**
+            
+            Automated code review by GitHub Copilot is in progress. This review will check for:
+            - Code quality and best practices
+            - Potential bugs and security issues
+            - Performance concerns
+            - Style and consistency
+            - Security vulnerabilities
+            
+            Please refer to [INSTRUCTIONS.md](https://github.com/${repo.owner}/${repo.repo}/blob/main/INSTRUCTIONS.md) for review guidelines.
+            
+            Please address any feedback provided by Copilot and maintainers.`;
+            
+            try {
+              await github.rest.issues.createComment({
+                owner: repo.owner,
+                repo: repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              console.log('✅ Review comment posted successfully');
+            } catch (error) {
+              console.error('Error posting comment:', error.message);
+            }
       
       - name: Get PR details
-        env:
-          GH_TOKEN: ${{ secrets.MY_TOKEN }}
-        run: |
-          echo "📋 PR Review Details:"
-          echo "PR #${{ github.event.pull_request.number }}"
-          echo "Author: ${{ github.event.pull_request.user.login }}"
-          echo "Title: ${{ github.event.pull_request.title }}"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+            const pr = context.payload.pull_request;
+            
+            console.log('📋 PR Review Details:');
+            console.log(`PR #${prNumber}`);
+            console.log(`Author: ${pr.user.login}`);
+            console.log(`Title: ${pr.title}`);
+            console.log(`Branch: ${pr.head.ref}`);
+            console.log(`Changes: ${pr.changed_files} files`);
           echo "Branch: ${{ github.event.pull_request.head.ref }}"
           echo "Changes: ${{ github.event.pull_request.changed_files }} files"
