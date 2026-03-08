@@ -20,7 +20,7 @@ jobs:
         run: echo "Processing release: ${{ github.ref }}"
       
       - name: Build artifacts
-        run: echo "Building release artifacts..."
+        run: echo "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"
       
       - name: Create release
         run: echo "Creating GitHub release..."
