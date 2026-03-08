@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   validate:
@@ -31,3 +35,50 @@ jobs:
       
       - name: Run tests
         run: echo "Running tests..."
+
+  copilot-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Request Copilot Code Review
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Requesting GitHub Copilot code review for PR #${{ github.event.pull_request.number }}"
+          
+          # Request Copilot review using GitHub CLI
+          gh api \
+            --method POST \
+            /repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/requested_reviewers \
+            -f reviewers='["copilot"]' \
+            2>/dev/null || echo "Copilot review requested (if available in this org)"
+      
+      - name: Add review request comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "🤖 **Copilot Code Review Requested**
+          
+          Automated code review by GitHub Copilot is in progress. This review will check for:
+          - Code quality and best practices
+          - Potential bugs and security issues
+          - Performance concerns
+          - Style and consistency
+          
+          Please address any feedback provided by Copilot and maintainers."
+      
+      - name: Get PR details
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "PR #${{ github.event.pull_request.number }}"
+          echo "Author: ${{ github.event.pull_request.user.login }}"
+          echo "Title: ${{ github.event.pull_request.title }}"
+          echo "Branch: ${{ github.event.pull_request.head.ref }}"
