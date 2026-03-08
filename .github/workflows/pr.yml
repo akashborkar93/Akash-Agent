@@ -48,7 +48,7 @@ jobs:
       
       - name: Request Copilot Code Review
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
         run: |
           echo "Requesting GitHub Copilot code review for PR #${{ github.event.pull_request.number }}"
           
@@ -61,7 +61,7 @@ jobs:
       
       - name: Add review request comment
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} \
             --body "🤖 **Copilot Code Review Requested**
@@ -76,7 +76,7 @@ jobs:
       
       - name: Get PR details
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.MY_TOKEN }}
         run: |
           echo "PR #${{ github.event.pull_request.number }}"
           echo "Author: ${{ github.event.pull_request.user.login }}"
