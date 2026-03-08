@@ -1,4 +1,4 @@
-# Akash-Agent
+# Akash-Agent-ask
 
 This repository is used for testing agents for DevOps workflows and infrastructure automation.
 
